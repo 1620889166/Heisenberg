@@ -1,0 +1,85 @@
+server {
+    listen 80;  # 监听 HTTP 端口
+    server_name www.yourname yourname;  # 绑定域名
+
+    location / {  # 所有请求都重定向到 HTTPS
+        return 301 https://$host$request_uri;  # 使用 301 永久重定向到 HTTPS
+    }
+
+#    location ~ /.well-known/acme-challenge/ {  # 用于 Let's Encrypt 证书验证
+#        root /data/letsencrypt;  # Let's Encrypt 验证文件存放路径
+#        allow all;  # 允许外部访问验证文件
+#    }
+}
+
+server {
+    listen 443 ssl http2;  # 启用 HTTPS 和 HTTP/2 协议
+    server_name www.yourname yourname;  # 绑定域名
+
+    ssl_certificate /letsencrypt/live/yourname/fullchain.pem;  # SSL 证书路径
+    ssl_certificate_key /letsencrypt/live/yourname/privkey.pem;  # SSL 私钥路径
+    ssl_dhparam /letsencrypt/dhparam-2048.pem;  # DH 参数配置，增强安全性
+    
+    ssl_protocols TLSv1.2 TLSv1.3;  # 使用安全的协议版本
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;  # 支持的加密套件
+    ssl_prefer_server_ciphers on;  # 优先使用服务端的加密套件
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;  # HSTS（强制 HTTPS）策略
+
+    ssl_session_timeout 5m;  # 会话超时时间
+    ssl_session_cache shared:SSL:10m;  # 会话缓存
+    ssl_buffer_size 8k;  # SSL 缓冲区大小
+    ssl_stapling on;  # 启用 OCSP Stapling
+    ssl_stapling_verify on;  # 启用 OCSP 校验
+
+    resolver 8.8.8.8 valid=300s;  # DNS 解析服务器，使用 Google DNS
+    resolver_timeout 5s;  # DNS 解析超时设置
+
+    access_log /var/log/nginx/www.yourname.access.log;  # 访问日志路径
+    error_log /var/log/nginx/www.yourname.error.log warn;  # 错误日志路径
+
+    location / {  # 反向代理配置
+        proxy_pass http://yourname/;  # 指定后端 WordPress 容器的地址
+        proxy_set_header Host $host;  # 设置 Host 请求头
+        proxy_set_header X-Real-IP $remote_addr;  # 传递真实的客户端 IP
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;  # 传递原始 IP
+        proxy_set_header X-Forwarded-Proto $scheme;  # 转发协议，告知后端请求使用 HTTPS
+        proxy_redirect off;
+#        proxy_http_version 1.1;  # 使用 HTTP/1.1 版本
+#        proxy_set_header Upgrade $http_upgrade;  # 支持 WebSocket 升级
+#        proxy_set_header Connection "upgrade";  # 连接升级设置
+    }
+
+#    location /wp-content/uploads/ {  # 指定 WordPress 上传文件的路径
+#        root /var/www/html;  # 静态文件路径
+#        expires 30d;  # 设置缓存时间为 30 天
+#        add_header Cache-Control "public, max-age=2592000";  # 添加缓存控制头
+#        access_log off;  # 关闭访问日志
+#        log_not_found off;  # 不记录未找到的文件
+#    }
+
+#    location ~* \.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$ {  # 针对常见静态文件的匹配
+#        expires 30d;  # 设置缓存时间为 30 天
+#        add_header Cache-Control "public, max-age=2592000";  # 添加缓存控制头
+#        access_log off;  # 关闭访问日志
+#        log_not_found off;  # 不记录未找到的文件
+#    }
+
+    error_page 404 /404.html;  # 404 错误页面
+    error_page 500 502 503 504 /50x.html;  # 500、502、503、504 错误页面
+
+    location = /404.html {  # 404 页面配置
+        root /usr/share/nginx/html;  # 错误页面的文件路径
+        internal;  # 内部请求，外部无法直接访问
+    }
+
+    location = /50x.html {  # 50x 错误页面配置
+        root /usr/share/nginx/html;  # 错误页面的文件路径
+        internal;  # 内部请求，外部无法直接访问
+    }
+
+#    location ~ /\. {  # 匹配以 . 开头的隐藏文件
+#        deny all;  # 禁止访问
+#        access_log off;  # 关闭访问日志
+#        log_not_found off;  # 不记录未找到的文件
+#    }
+}
